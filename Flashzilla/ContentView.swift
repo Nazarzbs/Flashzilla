@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 extension View {
     func stacked(at position: Int, in total: Int) -> some View {
@@ -18,7 +19,15 @@ struct ContentView: View {
     @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
     @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
     
-    @State private var cards = [Card]()
+    @Query(sort: [
+        SortDescriptor(\Card.created, order: .reverse)
+        ]) private var cards: [Card]
+
+    
+    @State private var answerWasCorrect = false
+    
+    @Environment(\.modelContext) var modelContext
+    
     @State private var showingEditScreen = false
     
     @State private var timeRemaining = 100
@@ -41,18 +50,20 @@ struct ContentView: View {
                     .padding(.vertical, 5)
                     .background(.black.opacity(0.75))
                     .clipShape(.capsule)
-                    
+                    .padding()
                 
                 ZStack {
-                    ForEach(0..<cards.count, id: \.self) { index in
-                        CardView(card: cards[index]) {
-                            withAnimation {
-                                removeCard(at: index)
+                    ForEach(cards, id: \.id) { card in
+                        if let index = cards.firstIndex(of: card) {
+                            CardView(answerWasCorrect: $answerWasCorrect, card: card) {
+                                withAnimation {
+                                    removeCard(at: index)
+                                }
                             }
+                            .stacked(at: index, in: cards.count)
+                            .allowsHitTesting(index == cards.count - 1)
+                            .accessibilityHidden(index < cards.count - 1)
                         }
-                        .stacked(at: index, in: cards.count)
-                        .allowsHitTesting(index == cards.count - 1)
-                        .accessibilityHidden(index < cards.count - 1)
                     }
                 }
                 .allowsHitTesting(timeRemaining > 0)
@@ -151,10 +162,17 @@ struct ContentView: View {
     }
     
     func removeCard(at index: Int) {
-        
         guard index >= 0 else { return }
         
-        cards.remove(at: index)
+        let cardToRemove = cards[index]
+        if answerWasCorrect == false {
+            modelContext.delete(cardToRemove)
+           
+        } else {
+            modelContext.delete(cardToRemove)
+            modelContext.insert(Card(id: UUID(), prompt: cardToRemove.prompt, answer: cardToRemove.answer, created: Date.now))
+            
+        }
         
         if cards.isEmpty {
             isActive = false
@@ -164,15 +182,6 @@ struct ContentView: View {
     func resetCards() {
         timeRemaining = 100
         isActive = true
-        loadData()
-    }
-    
-    func loadData() {
-        if let data = UserDefaults.standard.data(forKey: "Cards") {
-            if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
-                cards = decoded
-            }
-        }
     }
 }
 

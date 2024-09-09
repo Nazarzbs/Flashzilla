@@ -9,7 +9,7 @@ import SwiftUI
 
 struct CardView: View {
     @Environment(\.accessibilityDifferentiateWithoutColor) var accessibilityDifferentiateWithoutColor
-    
+    @Binding var answerWasCorrect: Bool
     @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
     @State private var isShowingAnswer = false
     @State private var offset = CGSize.zero
@@ -26,12 +26,7 @@ struct CardView: View {
                     : .white
                         .opacity(1 - Double(abs(offset.width / 50)))
                 )
-                .background(
-                    accessibilityDifferentiateWithoutColor
-                    ? nil
-                    : RoundedRectangle(cornerRadius: 25)
-                        .fill(offset.width > 0 ? .green : .red)
-                )
+                .modifier(OffsetBackgroundModifier(offset: offset, accessibilityDifferentiateWithoutColor: accessibilityDifferentiateWithoutColor))
                 .shadow(radius: 10)
             
             VStack {
@@ -65,6 +60,12 @@ struct CardView: View {
                     offset = gesture.translation
                 }
                 .onEnded { _ in
+                    if offset.width > 100 {
+                        answerWasCorrect = false
+                    } else {
+                        answerWasCorrect = true
+                    }
+                    
                     if abs(offset.width) > 100 {
                         removal?()
                     } else {
@@ -78,8 +79,25 @@ struct CardView: View {
         }
         .animation(.bouncy, value: offset)
     }
+    
+    struct OffsetBackgroundModifier: ViewModifier {
+        var offset: CGSize
+        var accessibilityDifferentiateWithoutColor: Bool
+        
+        func body(content: Content) -> some View {
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: 25)
+                        .fill(
+                            accessibilityDifferentiateWithoutColor
+                                ? Color.white
+                                : (offset.width > 0 ? Color.green : Color.red)
+                        )
+                )
+        }
+    }
 }
 
-#Preview {
-    CardView(card: .example)
-}
+//#Preview {
+//    CardView(card: .example, answerWasCorrect: <#Binding<Bool>#>)
+//}
